@@ -1,10 +1,28 @@
-#include "./Lw_Pid/lw_pid.h"
+#include "lw_pid.h"
 
 /********************静态函数声明********************/
 static float increment_pid_compute(Pid_object_t* pid_object, float current_input);
 static float fullscale_pid_compute(Pid_object_t* pid_object, float current_input);
 
 /********************全局函数定义********************/
+
+/**
+ * @brief	使能pid计算
+ * @param	pid_object pid对象
+ */
+void pid_enable(Pid_object_t* pid_object)
+{
+	pid_object->pid_state = PID_CALCU_ENABLE;
+}
+
+/**
+ * @brief	禁用pid计算
+ * @param	pid_object pid对象
+ */
+void pid_disable(Pid_object_t* pid_object)
+{
+	pid_object->pid_state = PID_CALCU_DISABLE;
+}
 
 /**
  * @brief	设置pid参数
@@ -139,6 +157,30 @@ void pid_init(Pid_object_t* pid_object)
 	{
 		pid_object->pid_compute = fullscale_pid_compute;
 	}
+	
+	pid_object->pid_state = PID_CALCU_ENABLE; /*初始化后的pid默认使能*/
+}
+
+/**
+ * @brief	pid运算函数
+ * @param	pid_object pid对象
+ * @param	current_input 当前反馈输入
+ * @return	运算结果
+ */
+float pid_calcu(Pid_object_t* pid_object, float current_input)
+{
+	float output;
+	
+	if(pid_object->pid_state == PID_CALCU_ENABLE)
+	{
+		output = pid_object->pid_compute(pid_object, current_input);
+	}
+	else
+	{
+		output = 0;
+	}
+	
+	return output;
 }
 
 /********************静态函数定义********************/

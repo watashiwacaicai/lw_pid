@@ -12,8 +12,10 @@ extern "C" {
 #define PID_OUTPUT_LIMIT_DISABLE	0
 #define PID_INTEGRAL_LIMIT_ENABLE	2
 #define PID_INTEGRAL_LIMIT_DISABLE	0
-#define PID_MODE_INCREMENT			3
-#define PID_MODE_FULLSCALE			4
+#define PID_CALCU_ENABLE			3
+#define PID_CALCU_DISABLE			0
+#define PID_MODE_INCREMENT			4
+#define PID_MODE_FULLSCALE			5
 
 
 /********************数据类型定义********************/
@@ -38,6 +40,7 @@ struct Pid_object
 	uint8_t output_limit_state;	/*输出限幅的使用状态*/
 	uint8_t intergral_limit_state; /*积分限幅的使用状态*/
 	uint8_t pid_mode; /*pid的计算模式*/
+	uint8_t pid_state; /*pid状态*/
 	float (*pid_compute)(Pid_object_t* pid_object, float current_input); /*pid计算句柄*/
 };
 
@@ -53,6 +56,9 @@ void pid_intergral_limit_disable(Pid_object_t* pid_object);
 void pid_set_intergral_limit(Pid_object_t* pid_object, float upper_limit, float floor_limit);
 void pid_set_mode_increment(Pid_object_t* pid_object);
 void pid_set_mode_fullscale(Pid_object_t* pid_object);
+void pid_enable(Pid_object_t* pid_object);
+void pid_disable(Pid_object_t* pid_object);
+float pid_calcu(Pid_object_t* pid_object, float current_input);
 void pid_init(Pid_object_t* pid_object);
 
 #ifdef __cplusplus
