@@ -22,6 +22,10 @@ void pid_enable(Pid_object_t* pid_object)
 void pid_disable(Pid_object_t* pid_object)
 {
 	pid_object->pid_state = PID_CALCU_DISABLE;
+	pid_object->error0 = 0.0f;
+	pid_object->error1 = 0.0f;
+	pid_object->error2 = 0.0f;
+	pid_object->error_intergral = 0.0f;
 }
 
 /**
@@ -117,6 +121,37 @@ void pid_set_intergral_limit(Pid_object_t* pid_object, float upper_limit, float 
 }
 
 /**
+ * @brief	使能pid的输出偏移
+ * @param	pid_object pid对象
+ * @return	无
+ */
+void pid_output_offset_enable(Pid_object_t* pid_object)
+{
+	pid_object->output_offset_state = PID_OUTPUT_OFFSET_ENABLE;
+}
+
+/**
+ * @brief	禁用pid的输出偏移
+ * @param	pid_object pid对象
+ * @return	无
+ */
+void pid_output_offset_disable(Pid_object_t* pid_object)
+{
+	pid_object->output_offset_state = PID_OUTPUT_OFFSET_DISABLE;
+}
+
+/**
+ * @brief	设置pid的输出偏移值
+ * @param	pid_object pid对象
+ * @param	output_offset_val 输出偏移
+ * @return	无
+ */
+void pid_set_output_offset(Pid_object_t* pid_object, float output_offset_val)
+{
+	pid_object->output_offset = output_offset_val;
+}
+
+/**
  * @brief	设置pid为增量式
  * @param	pid_object pid对象
  * @return	无
@@ -143,10 +178,10 @@ void pid_set_mode_fullscale(Pid_object_t* pid_object)
  */
 void pid_init(Pid_object_t* pid_object)
 {
-	pid_object->error0 = 0.0;
-	pid_object->error1 = 0.0;
-	pid_object->error2 = 0.0;
-	pid_object->error_intergral = 0.0;
+	pid_object->error0 = 0.0f;
+	pid_object->error1 = 0.0f;
+	pid_object->error2 = 0.0f;
+	pid_object->error_intergral = 0.0f;
 	
 	/*如果选择为增量式*/
 	if(pid_object->pid_mode == PID_MODE_INCREMENT)
@@ -198,6 +233,19 @@ static float increment_pid_compute(Pid_object_t* pid_object, float current_input
 	output = pid_object->kp * (pid_object->error0 - pid_object->error1) + pid_object->ki * pid_object->error0
 					+ pid_object->kd * (pid_object->error0 - 2 * pid_object->error1 + pid_object->error2);
 	
+	/*如果使能了输出偏移*/
+	if(pid_object->output_offset_state == PID_OUTPUT_OFFSET_ENABLE)
+	{
+		if(output > 0.0f)
+		{
+			output += pid_object->output_offset;
+		}
+		else if(output < 0.0f)
+		{
+			output -= pid_object->output_offset;
+		}
+	}
+	
 	/*如果使能了输出限幅*/
 	if(pid_object->output_limit_state == PID_OUTPUT_LIMIT_ENABLE)
 	{
@@ -241,6 +289,19 @@ static float fullscale_pid_compute(Pid_object_t* pid_object, float current_input
 
 	output = pid_object->kp * pid_object->error0 + pid_object->ki * pid_object->error_intergral 
 				+ pid_object->kd * (pid_object->error0 - pid_object->error1);
+	
+	/*如果使能了输出偏移*/
+	if(pid_object->output_offset_state == PID_OUTPUT_OFFSET_ENABLE)
+	{
+		if(output > 0.0f)
+		{
+			output += pid_object->output_offset;
+		}
+		else if(output < 0.0f)
+		{
+			output -= pid_object->output_offset;
+		}
+	}
 	
 	/*如果使能了输出限幅*/
 	if(pid_object->output_limit_state == PID_OUTPUT_LIMIT_ENABLE)

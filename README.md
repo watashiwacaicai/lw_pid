@@ -1,4 +1,4 @@
-这是一个轻量级的pid工具库，目前支持位置式pid和增量式pid的计算，同时也具备输出限幅与积分限幅（仅位置式pid）的功能，不依赖于具体的硬件，可在任意C语言平台上使用。
+这是一个轻量级的pid工具库，目前支持位置式pid和增量式pid的计算，同时也具备输出限幅，输出偏移与积分限幅（仅位置式pid）的功能，不依赖于具体的硬件，可在任意C语言平台上使用。
 
 ### 如何移植
 
@@ -31,6 +31,8 @@ void motor_pid_init(void)
 	pid_set_output_limit(&motor_pid, 500.0, -500.0); /*设置输出限幅的上下限*/
 	pid_intergral_limit_enable(&motor_pid); /*使能积分限幅*/
 	pid_set_intergral_limit(&motor_pid, 250.0, -250.0); /*设置积分限幅的上下限*/
+    pid_output_offset_enable(&r_speed_pid); /*使能输出偏移*/
+	pid_set_output_offset(&r_speed_pid, 400.0f); /*设置输出偏移*/
 	pid_set_mode_fullscale(&motor_pid); /*设置使用位置式pid*/
 	pid_init(&motor_pid); /*初始化电机pid对象*/
 }
