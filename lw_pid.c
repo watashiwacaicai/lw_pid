@@ -1,4 +1,16 @@
+/**
+ * @file lw_pid.c
+ * @author watashiwacaicai (woshixiaoqi676@gmail.com)
+ * @version 1.3.0
+ * @date 2025-7-15
+ * 
+ * @copyright (c) 2025 watashiwacaicai
+ * 
+ */
+
 #include "lw_pid.h"
+#include "math.h"
+#include "stdbool.h"
 
 /********************静态函数声明********************/
 static float increment_pid_compute(Pid_object_t* pid_object, float current_input);
@@ -121,6 +133,37 @@ void pid_set_intergral_limit(Pid_object_t* pid_object, float upper_limit, float 
 }
 
 /**
+ * @brief	使能pid的输入死区
+ * @param	pid_object pid对象
+ * @return	无
+ */
+void pid_input_dead_zone_enable(Pid_object_t* pid_object)
+{
+	pid_object->input_dead_zone_state = PID_INPUT_DEAD_ZONE_ENABLE;
+}
+
+/**
+ * @brief	失能pid的输入死区
+ * @param	pid_object pid对象
+ * @return	无
+ */
+void pid_input_dead_zone_disable(Pid_object_t* pid_object)
+{
+	pid_object->input_dead_zone_state = PID_INPUT_DEAD_ZONE_DISABLE;
+}
+
+/**
+ * @brief	设置pid的输入死区值
+ * @param	pid_object pid对象
+ * @param	input_dead_zone_val 输入死区
+ * @return	无
+ */
+void pid_set_input_dead_zone(Pid_object_t* pid_object, float input_dead_zone_val)
+{
+	pid_object->input_dead_zone = input_dead_zone_val;
+}
+
+/**
  * @brief	使能pid的输出偏移
  * @param	pid_object pid对象
  * @return	无
@@ -149,6 +192,26 @@ void pid_output_offset_disable(Pid_object_t* pid_object)
 void pid_set_output_offset(Pid_object_t* pid_object, float output_offset_val)
 {
 	pid_object->output_offset = output_offset_val;
+}
+
+/**
+ * @brief	使能增量式pid的全量输出
+ * @param	pid_object pid对象
+ * @return	无
+ */
+void pid_incre_output_fullscale_enable(Pid_object_t* pid_object)
+{
+	pid_object->incre_output_fullscale_state = PID_INCRE_OUTPUT_FULLSCALE_ENABLE;
+}
+
+/**
+ * @brief	失能增量式pid的全量输出
+ * @param	pid_object pid对象
+ * @return	无
+ */
+void pid_incre_output_fullscale_disable(Pid_object_t* pid_object)
+{
+	pid_object->incre_output_fullscale_state = PID_INCRE_OUTPUT_FULLSCALE_DISABLE;
 }
 
 /**
@@ -181,6 +244,7 @@ void pid_init(Pid_object_t* pid_object)
 	pid_object->error0 = 0.0f;
 	pid_object->error1 = 0.0f;
 	pid_object->error2 = 0.0f;
+	pid_object->output = 0.0f;
 	pid_object->error_intergral = 0.0f;
 	
 	/*如果选择为增量式*/
@@ -204,15 +268,16 @@ void pid_init(Pid_object_t* pid_object)
  */
 float pid_calcu(Pid_object_t* pid_object, float current_input)
 {
-	float output;
+	float output = 0.0f;
 	
+	/*如果使能了pid*/
 	if(pid_object->pid_state == PID_CALCU_ENABLE)
 	{
 		output = pid_object->pid_compute(pid_object, current_input);
 	}
 	else
 	{
-		output = 0;
+		output = 0.0f;
 	}
 	
 	return output;
@@ -223,99 +288,167 @@ float pid_calcu(Pid_object_t* pid_object, float current_input)
 /*计算增量式pid*/
 static float increment_pid_compute(Pid_object_t* pid_object, float current_input)
 {
-	float output;
+	int is_need_pid_calcu = 0;
+	float delta_output = 0.0f;
+	
+	/*输入安全检查*/
+	if(isnan(current_input))
+	{
+		while(1); /*如果您的程序停止在了这里，说明pid出现了非法的输入*/
+	}
 	
 	/*误差传递*/
 	pid_object->error2 = pid_object->error1;
 	pid_object->error1 = pid_object->error0;
 	pid_object->error0 = pid_object->target - current_input;
 	
-	output = pid_object->kp * (pid_object->error0 - pid_object->error1) + pid_object->ki * pid_object->error0
-					+ pid_object->kd * (pid_object->error0 - 2 * pid_object->error1 + pid_object->error2);
-	
-	/*如果使能了输出偏移*/
-	if(pid_object->output_offset_state == PID_OUTPUT_OFFSET_ENABLE)
+	/*如果使能了输入死区*/
+	if(pid_object->input_dead_zone_state == PID_INPUT_DEAD_ZONE_ENABLE)
 	{
-		if(output > 0.0f)
+		/*如果当前误差小于死区*/
+		if(fabs(pid_object->error0) < pid_object->input_dead_zone)
 		{
-			output += pid_object->output_offset;
+			pid_object->output = 0.0f;
+			is_need_pid_calcu = false; /*不计算pid*/
 		}
-		else if(output < 0.0f)
+		else
 		{
-			output -= pid_object->output_offset;
+			is_need_pid_calcu = true; /*计算pid*/
 		}
 	}
-	
-	/*如果使能了输出限幅*/
-	if(pid_object->output_limit_state == PID_OUTPUT_LIMIT_ENABLE)
+	else
 	{
-		if(output > pid_object->output_upper_limit)
-		{
-			output = pid_object->output_upper_limit;
-		}
-		if(output < pid_object->output_floor_limit)
-		{
-			output = pid_object->output_floor_limit;
-		}
+		is_need_pid_calcu = true; /*计算pid*/
 	}
 	
-	return output;
+	/*如果需要计算pid*/
+	if(is_need_pid_calcu == true)
+	{
+	
+		delta_output = pid_object->kp * (pid_object->error0 - pid_object->error1) + pid_object->ki * pid_object->error0
+								+ pid_object->kd * (pid_object->error0 - 2 * pid_object->error1 + pid_object->error2);
+		
+		/*如果使能了增量式pid全量化输出*/
+		if(pid_object->incre_output_fullscale_state == PID_INCRE_OUTPUT_FULLSCALE_ENABLE)
+		{
+			pid_object->output = pid_object->output + delta_output;
+		}
+		else
+		{
+			pid_object->output = delta_output;
+		}
+		
+		/*如果使能了输出偏移*/
+		if(pid_object->output_offset_state == PID_OUTPUT_OFFSET_ENABLE)
+		{
+			if(pid_object->output > 0.0f)
+			{
+				pid_object->output += pid_object->output_offset;
+			}
+			else if(pid_object->output < 0.0f)
+			{
+				pid_object->output -= pid_object->output_offset;
+			}
+		}
+		
+		/*如果使能了输出限幅*/
+		if(pid_object->output_limit_state == PID_OUTPUT_LIMIT_ENABLE)
+		{
+			if(pid_object->output > pid_object->output_upper_limit)
+			{
+				pid_object->output = pid_object->output_upper_limit;
+			}
+			if(pid_object->output < pid_object->output_floor_limit)
+			{
+				pid_object->output = pid_object->output_floor_limit;
+			}
+		}		
+	}
+			
+	return pid_object->output;
 }
 
 /*计算位置式pid*/
 static float fullscale_pid_compute(Pid_object_t* pid_object, float current_input)
-{
-	float output;
+{	
+	int is_need_pid_calcu = 0;
+	
+	/*输入安全检查*/
+	if(isnan(current_input))
+	{
+		while(1); /*如果您的程序停止在了这里，说明pid出现了非法的输入*/
+	}
 	
 	/*误差传递*/
 	pid_object->error1 = pid_object->error0;
 	pid_object->error0 = pid_object->target - current_input;
 	
-	/*计算积分*/
-	pid_object->error_intergral += pid_object->error0;
-	
-	/*如果使能了积分限幅*/
-	if(pid_object->intergral_limit_state == PID_INTEGRAL_LIMIT_ENABLE)
+	/*如果使能了输入死区*/
+	if(pid_object->input_dead_zone_state == PID_INPUT_DEAD_ZONE_ENABLE)
 	{
-		if(pid_object->error_intergral > pid_object->intergral_upper_limit)
+		/*如果当前误差小于死区*/
+		if(fabs(pid_object->error0) < pid_object->input_dead_zone)
 		{
-			pid_object->error_intergral = pid_object->intergral_upper_limit;
+			pid_object->output = 0.0f;
+			is_need_pid_calcu = false; /*不计算pid*/
 		}
-		if(pid_object->error_intergral < pid_object->intergral_floor_limit)
+		else
 		{
-			pid_object->error_intergral = pid_object->intergral_floor_limit;
+			is_need_pid_calcu = true; /*计算pid*/
 		}
 	}
+	else
+	{
+		is_need_pid_calcu = true; /*计算pid*/
+	}
+	
+	if(is_need_pid_calcu == true)
+	{
+		/*计算积分*/
+		pid_object->error_intergral += pid_object->error0;
+		
+		/*如果使能了积分限幅*/
+		if(pid_object->intergral_limit_state == PID_INTEGRAL_LIMIT_ENABLE)
+		{
+			if(	pid_object->error_intergral > pid_object->intergral_upper_limit)
+			{
+				pid_object->error_intergral = pid_object->intergral_upper_limit;
+			}
+			if(pid_object->error_intergral < pid_object->intergral_floor_limit)
+			{
+				pid_object->error_intergral = pid_object->intergral_floor_limit;
+			}
+		}
 
-	output = pid_object->kp * pid_object->error0 + pid_object->ki * pid_object->error_intergral 
-				+ pid_object->kd * (pid_object->error0 - pid_object->error1);
+		pid_object->output = pid_object->kp * pid_object->error0 + pid_object->ki * pid_object->error_intergral 
+									+ pid_object->kd * (pid_object->error0 - pid_object->error1);
 	
-	/*如果使能了输出偏移*/
-	if(pid_object->output_offset_state == PID_OUTPUT_OFFSET_ENABLE)
-	{
-		if(output > 0.0f)
+		/*如果使能了输出偏移*/
+		if(pid_object->output_offset_state == PID_OUTPUT_OFFSET_ENABLE)
 		{
-			output += pid_object->output_offset;
+			if(pid_object->output > 0.0f)
+			{
+				pid_object->output += pid_object->output_offset;
+			}
+			else if(pid_object->output < 0.0f)
+			{
+				pid_object->output -= pid_object->output_offset;
+			}
 		}
-		else if(output < 0.0f)
+			
+			/*如果使能了输出限幅*/
+		if(pid_object->output_limit_state == PID_OUTPUT_LIMIT_ENABLE)
 		{
-			output -= pid_object->output_offset;
+			if(pid_object->output > pid_object->output_upper_limit)
+			{
+				pid_object->output = pid_object->output_upper_limit;
+			}
+			if(pid_object->output < pid_object->output_floor_limit)
+			{
+				pid_object->output = pid_object->output_floor_limit;
+			}
 		}
 	}
 	
-	/*如果使能了输出限幅*/
-	if(pid_object->output_limit_state == PID_OUTPUT_LIMIT_ENABLE)
-	{
-		if(output > pid_object->output_upper_limit)
-		{
-			output = pid_object->output_upper_limit;
-		}
-		if(output < pid_object->output_floor_limit)
-		{
-			output = pid_object->output_floor_limit;
-		}
-	}
-	
-	return output;
-	
+	return pid_object->output;	
 }

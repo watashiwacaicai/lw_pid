@@ -1,3 +1,13 @@
+/**
+ * @file lw_pid.h
+ * @author watashiwacaicai (woshixiaoqi676@gmail.com)
+ * @version 1.3.0
+ * @date 2025-7-15
+ * 
+ * @copyright (c) 2025 watashiwacaicai
+ * 
+ */
+
 #ifndef __LW_PID_H
 #define __LW_PID_H
 
@@ -18,6 +28,10 @@ extern "C" {
 #define PID_MODE_FULLSCALE			((uint8_t)0x05)
 #define PID_OUTPUT_OFFSET_ENABLE	((uint8_t)0x06)
 #define PID_OUTPUT_OFFSET_DISABLE	((uint8_t)0x00)
+#define PID_INPUT_DEAD_ZONE_ENABLE	((uint8_t)0x07)
+#define PID_INPUT_DEAD_ZONE_DISABLE	((uint8_t)0x00)
+#define PID_INCRE_OUTPUT_FULLSCALE_ENABLE	((uint8_t)0x08)
+#define PID_INCRE_OUTPUT_FULLSCALE_DISABLE	((uint8_t)0x00)
 
 /********************数据类型定义********************/
 
@@ -29,12 +43,14 @@ struct Pid_object
 	float kp;
 	float ki;
 	float kd;
+	float output;
 	float target;
 	float error0; /*当前误差*/
 	float error1; /*上一次误差*/
 	float error2; /*上上次误差*/
 	float error_intergral; /*积分数值*/
 	float output_offset; /*输出偏移*/
+	float input_dead_zone; /*输入死区*/
 	float output_upper_limit; /*输出限幅上限*/
 	float output_floor_limit; /*输出限幅下限*/
 	float intergral_upper_limit; /*积分限幅上限*/
@@ -42,6 +58,8 @@ struct Pid_object
 	uint8_t output_offset_state; /*输出偏移的使用状态*/
 	uint8_t output_limit_state;	/*输出限幅的使用状态*/
 	uint8_t intergral_limit_state; /*积分限幅的使用状态*/
+	uint8_t input_dead_zone_state; /*输入死区的使用状态*/
+	uint8_t incre_output_fullscale_state; /*增量输出为全量的使用状态*/
 	uint8_t pid_mode; /*pid的计算模式*/
 	uint8_t pid_state; /*pid状态*/
 	float (*pid_compute)(Pid_object_t* pid_object, float current_input); /*pid计算句柄*/
@@ -59,7 +77,12 @@ void pid_intergral_limit_disable(Pid_object_t* pid_object);
 void pid_set_intergral_limit(Pid_object_t* pid_object, float upper_limit, float floor_limit);
 void pid_output_offset_enable(Pid_object_t* pid_object);
 void pid_output_offset_disable(Pid_object_t* pid_object);
+void pid_input_dead_zone_enable(Pid_object_t* pid_object);
+void pid_input_dead_zone_disable(Pid_object_t* pid_object);
+void pid_incre_output_fullscale_enable(Pid_object_t* pid_object);
+void pid_incre_output_fullscale_disable(Pid_object_t* pid_object);
 void pid_set_output_offset(Pid_object_t* pid_object, float output_offset_val);
+void pid_set_input_dead_zone(Pid_object_t* pid_object, float input_dead_zone_val);
 void pid_set_mode_increment(Pid_object_t* pid_object);
 void pid_set_mode_fullscale(Pid_object_t* pid_object);
 void pid_enable(Pid_object_t* pid_object);
